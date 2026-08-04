@@ -9,6 +9,9 @@ repository = "https://github.com/Slipum/httplib"
 readme = "README.md"
 keywords = ["http", "server", "web", "framework", "router"]
 categories = ["web-programming::http-server", "network-programming"]
+exclude = [
+    ".github/",
+]
 
 [dependencies]
 chrono = "0.4"
