@@ -44,6 +44,7 @@ fn handler_health(_request: &Request, _params: &[&str]) -> Response {
 - Use json
 ```rust
 fn handler_hello(_request: &Request, _params: &[&str]) -> Response {
+    let id = params.get(0).copied().unwrap_or("");
     // let body = json!({ "message": "hello" }).to_string(); // use lib `serde_json::json;`
     let body = format!("{{ \"user\": \"{id}\" }}"); // without json lib
 
