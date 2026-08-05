@@ -32,7 +32,29 @@ fn build_router() -> Router {
 }
 ```
 
+> Supported method of http: 
+```md
+    GET,
+    POST,
+    DELETE,
+    PUT,
+    PATCH,
+```
+
 ### Handles
+
+> Basic 
+
+- text `response::text(<status_code>, <text>)`
+- json `response::json(<status_code>, <json_to_string>)`
+- handle:
+```rust
+fn handle_name(_request: &Request, _params: &[&str]) -> Response {
+    ...
+}
+```
+
+---
 
 - Use text
 ```rust
@@ -45,14 +67,14 @@ fn handler_health(_request: &Request, _params: &[&str]) -> Response {
 ```rust
 fn handler_hello(_request: &Request, _params: &[&str]) -> Response {
     let id = params.get(0).copied().unwrap_or("");
-    // let body = json!({ "message": "hello" }).to_string(); // use lib `serde_json::json;`
+    // let body = json!({ "user": id }).to_string(); // use lib `serde_json::json;`
     let body = format!("{{ \"user\": \"{id}\" }}"); // without json lib
 
     response::json(200, &body)
 }
 ```
 
-- get params (use `serde_json`, `serde`)
+- Post with json
 ```rust
 
 #[derive(Deserialize)]
@@ -74,8 +96,9 @@ fn handler_creat_user(_request: &Request, params: &[&str]) -> Response {
 }
 ```
 
+> use for json 
 ```toml
 [dependencies]
-serde_json = "1.0.151"
-serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 ```
