@@ -8,64 +8,75 @@ pub enum Method {
     PATCH,
 }
 
-struct header {
+struct Header {
     protocol: Option<String>, // Protocol like: HTTP/1.1 ...
 
-    Host: Option<String>, // Url for host
+    host: Option<String>, // Url for host
 
-    User_Agent: Option<String>, // Browser
+    user_agent: Option<String>, // Browser
 
-    Accept: Option<Vec<String>>, // Type of request
-    Accept_Language: Option<Vec<String>>,
-    Accept_Encoding: Option<Vec<String>>,
+    accept: Option<Vec<String>>, // Type of request
+    accept_language: Option<Vec<String>>,
+    accept_encoding: Option<Vec<String>>,
 
-    Sec_GPC: Option<i8>,
-    Connection: Option<String>,
-    Cookie: Option<HashMap<String, String>>, // Basic Cookie
-    Upgrade_Insecure_Requests: Option<i8>,
+    sec_gpc: Option<i8>,
+    connection: Option<String>,
+    cookie: Option<HashMap<String, String>>, // Basic Cookie
+    upgrade_insecure_requests: Option<i8>,
 
-    Sec_Fetch_Dest: Option<String>,
-    Sec_Fetch_Mode: Option<String>,
-    Sec_Fetch_Site: Option<String>,
-    Sec_Fetch_User: Option<String>,
+    sec_fetch_dest: Option<String>,
+    sec_fetch_mode: Option<String>,
+    sec_fetch_site: Option<String>,
+    sec_fetch_user: Option<String>,
 
-    DNT: Option<i8>,
-    Priority: Option<String>,
+    dnt: Option<i8>,
+    priority: Option<String>,
 }
 
 pub struct Request {
     method: Option<Method>,
     route: Option<String>,
 
-    header: Option<header>,
+    header: Option<Header>,
 
     body: Option<String>,
+
+    query: HashMap<String, String>,
 }
 
-pub fn New() -> Request {
+pub fn new() -> Request {
     Request{
         method: None,
         route: None,
         header: None,
         body: None,
+        query: HashMap::new(),
     }
 }
 
-pub fn From(req: &[impl AsRef<str>]) -> Request {
+pub fn from(req: &[impl AsRef<str>]) -> Request {
     parse_request(&req).expect("Failed to parse http request")
 }
 
 impl Request {
-    pub fn GetRoute(&self) -> String {
+    pub fn get_route(&self) -> String {
         String::from(self.route.as_ref().unwrap())
     }
 
-    pub fn GetMethod(&self) -> Method {
+    pub fn get_method(&self) -> Method {
         self.method.expect("Method not set")
     }
 
-    pub fn GetBody(&self) -> String {
+    pub fn get_body(&self) -> String {
         String::from(self.body.as_ref().unwrap())
+    }
+
+    pub fn get_protocol(self) -> Option<String> {
+        self.header?.protocol
+    }
+
+    pub fn get_query(&self, key: &str) -> Option<&str> {
+        self.query.get(key).map(|s| s.as_str())
     }
 }
 
@@ -77,28 +88,31 @@ fn parse_request(text: &[impl AsRef<str>]) -> Option<Request> {
     let mut start = text[0].as_ref().split_whitespace();
 
     let method = start.next()?.to_string();
-    let route = start.next()?.to_string();
+    let raw_route = start.next()?.to_string();
     let protocol = start.next()?.to_string();
 
+    let (route, query_map) = match raw_route.split_once('?') {
+        Some((path, query_str)) => (path.to_string(), parse_query(query_str)),
+        None => (raw_route, HashMap::new()),
+    };
 
-
-    let mut header = header{
+    let mut header = Header{
         protocol: Some(protocol),
-        Host: None,
-        User_Agent: None,
-        Accept: None,
-        Accept_Language: None,
-        Accept_Encoding: None,
-        Sec_GPC: None,
-        Connection: None,
-        Cookie: None,
-        Upgrade_Insecure_Requests: None,
-        Sec_Fetch_Dest: None,
-        Sec_Fetch_Mode: None,
-        Sec_Fetch_Site: None,
-        Sec_Fetch_User: None,
-        DNT: None,
-        Priority: None,
+        host: None,
+        user_agent: None,
+        accept: None,
+        accept_language: None,
+        accept_encoding: None,
+        sec_gpc: None,
+        connection: None,
+        cookie: None,
+        upgrade_insecure_requests: None,
+        sec_fetch_dest: None,
+        sec_fetch_mode: None,
+        sec_fetch_site: None,
+        sec_fetch_user: None,
+        dnt: None,
+        priority: None,
     };
 
     for l in &text[1..] {
@@ -113,21 +127,21 @@ fn parse_request(text: &[impl AsRef<str>]) -> Option<Request> {
             let value = value.trim().to_string();
 
             match key.as_str() {
-                "host" => header.Host = Some(value),
-                "user-agent" => header.User_Agent = Some(value),
-                "accept" => header.Accept = Some(value.split(',').map(|s| s.trim().to_string()).collect()),
-                "accept-language" => header.Accept_Language = Some(value.split(',').map(|s| s.trim().to_string()).collect()),
-                "accept-encoding" => header.Accept_Encoding = Some(value.split(',').map(|s| s.trim().to_string()).collect()),
-                "sec-gpc" => header.Sec_GPC = Some(value.parse::<i8>().ok()?),
-                "connection" => header.Connection = Some(value),
-                "cookie" => header.Cookie = Some(parse_cookie(value)),
-                "upgrade-insecure-requests" => header.Upgrade_Insecure_Requests = Some(value.parse::<i8>().ok()?),
-                "sec-fetch-dest" => header.Sec_Fetch_Dest = Some(value),
-                "sec-fetch-mode" => header.Sec_Fetch_Mode = Some(value),
-                "sec-fetch-site" => header.Sec_Fetch_Site = Some(value),
-                "sec-fetch-user" => header.Sec_Fetch_User = Some(value),
-                "DNT" => header.DNT = Some(value.parse::<i8>().ok()?),
-                "priority" => header.Priority = Some(value),
+                "host" => header.host = Some(value),
+                "user-agent" => header.user_agent = Some(value),
+                "accept" => header.accept = Some(value.split(',').map(|s| s.trim().to_string()).collect()),
+                "accept-language" => header.accept_language = Some(value.split(',').map(|s| s.trim().to_string()).collect()),
+                "accept-encoding" => header.accept_encoding = Some(value.split(',').map(|s| s.trim().to_string()).collect()),
+                "sec-gpc" => header.sec_gpc = Some(value.parse::<i8>().ok()?),
+                "connection" => header.connection = Some(value),
+                "cookie" => header.cookie = Some(parse_cookie(value)),
+                "upgrade-insecure-requests" => header.upgrade_insecure_requests = Some(value.parse::<i8>().ok()?),
+                "sec-fetch-dest" => header.sec_fetch_dest = Some(value),
+                "sec-fetch-mode" => header.sec_fetch_mode = Some(value),
+                "sec-fetch-site" => header.sec_fetch_site = Some(value),
+                "sec-fetch-user" => header.sec_fetch_user = Some(value),
+                "DNT" => header.dnt = Some(value.parse::<i8>().ok()?),
+                "priority" => header.priority = Some(value),
                 _ => {}
             }
         }
@@ -138,6 +152,7 @@ fn parse_request(text: &[impl AsRef<str>]) -> Option<Request> {
         route: Some(route),
         header: Some(header),
         body: Some(text.last()?.as_ref().to_string()),
+        query: query_map,
     })
 }
 
@@ -164,4 +179,17 @@ fn parse_cookie(cookies: impl AsRef<str>) -> HashMap<String, String> {
     }
 
     cookies_map
+}
+
+fn parse_query(query_str: &str) -> HashMap<String, String> {
+    let mut query_map = HashMap::new();
+    for pair in query_str.split('&') {
+        if let Some((key, value)) = pair.split_once('=') {
+            query_map.insert(
+                key.trim().to_string(),
+                value.trim().to_string()
+            );
+        }
+    }
+    query_map
 }

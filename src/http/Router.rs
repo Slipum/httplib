@@ -1,4 +1,3 @@
-use std::net::TcpStream;
 use crate::http::{Method, Request};
 use crate::http::response::Response;
 
@@ -37,29 +36,36 @@ impl Router {
         self
     }
 
-    /// Ищет маршрут, совпадающий по методу и сегментам пути.
-    /// Сегмент вида "{id}" в определении маршрута считается параметром
-    /// и совпадает с любым значением, которое возвращается в params.
     pub fn find(&self, method: Method, path_parts: &[&str]) -> Option<(Handler, Vec<String>)> {
-        'route: for route in &self.routes {
+        for route in &self.routes {
             if route.method != method {
                 continue;
             }
-            if route.segments.len() != path_parts.len() {
-                continue;
-            }
 
-            let mut params = Vec::new();
-            for (seg, part) in route.segments.iter().zip(path_parts.iter()) {
-                if seg.starts_with('{') && seg.ends_with('}') {
-                    params.push(part.to_string());
-                } else if seg != part {
-                    continue 'route;
-                }
+            if let Some(params) = parse_params(&route.segments, path_parts) {
+                return Some((route.handler, params));
             }
-
-            return Some((route.handler, params));
         }
         None
     }
+}
+
+fn parse_params(route_segments: &[String], path_parts: &[&str]) -> Option<Vec<String>> {
+    if route_segments.len() != path_parts.len() {
+        return None;
+    }
+
+    let mut params = Vec::new();
+
+    for (seg, part) in route_segments.iter().zip(path_parts.iter()) {
+        if seg.starts_with('{') && seg.ends_with('}') {
+            params.push(part.to_string());
+        } else if seg != part {
+            return None;
+        }
+
+        
+    }
+
+    Some(params)
 }

@@ -2,7 +2,13 @@ use httplib::{Server, Router, Request, Response, Method, response};
 
 fn handler_get_user(_request: &Request, params: &[&str]) -> Response {
     let id = params.get(0).copied().unwrap_or("");
-    let body = format!("{{ \"user\": \"{id}\" }}");
+    let name = _request.get_query("name").unwrap_or("");
+    let da = _request.get_query("da").unwrap_or("");
+    let body = format!("{{
+    \"user\": \"{id}\",
+    \"name\": \"{name}\",
+    \"da\": \"{da}\"
+    }}");
 
     response::json(200, &body)
 }
@@ -14,7 +20,7 @@ fn handler_health(_request: &Request, _params: &[&str]) -> Response {
 fn handler_hello(_request: &Request, _params: &[&str]) -> Response {
     let body = format!("{{ \"message\": \"hello\" }}");
 
-    response::json(200, &body)
+    response::json(200, &body).http2().set_phrase("hello")
 }
 
 // #[derive(Deserialize)]

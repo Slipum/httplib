@@ -61,20 +61,28 @@ impl Server {
     }
 
     fn dispatch(&self, text: Vec<&str>, stream: &TcpStream) {
-        let req: Request = request::From(&text);
+        let req: Request = request::from(&text);
         if self.logger_enabled {
             let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-            println!("[LOGGER] {} | {:?} {}", now, req.GetMethod(), req.GetRoute());
+            println!("[LOGGER] {} | {:?} {}", now, req.get_method(), req.get_route());
         }
 
-        let http_route = req.GetRoute();
-        let path_parts: Vec<&str> = http_route
+        let http_route = req.get_route();
+
+        let clean_route = match http_route.split_once('?') {
+            Some((path, _query_string)) => {
+                path
+            }
+            None => http_route.as_str(),
+        };
+
+        let path_parts: Vec<&str> = clean_route
             .trim_matches('/')
             .split('/')
             .filter(|s| !s.is_empty())
             .collect();
 
-        match self.router.find(req.GetMethod(), &path_parts) {
+        match self.router.find(req.get_method(), &path_parts) {
             Some((handler, params)) => {
                 let params_refs: Vec<&str> = params.iter().map(|s| s.as_str()).collect();
                 handler(&req, &params_refs).write(&stream);

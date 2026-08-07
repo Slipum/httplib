@@ -2,6 +2,18 @@
 
 Lightweight HTTP server and router built in Rust
 
+## Instalation 
+
+- `Cargo.toml`
+```toml
+[dependencies]
+httplib = "1.2"
+```
+or
+```bash
+cargo add httplib
+```
+
 ## Examples
 
 ### Server
@@ -52,6 +64,13 @@ fn build_router() -> Router {
 fn handle_name(_request: &Request, _params: &[&str]) -> Response {
     ...
 }
+```
+
+### Route params
+
+```rust
+let name = _request.get_query("name").unwrap_or("");
+let id = params.get(0).copied().unwrap_or("");
 ```
 
 ---

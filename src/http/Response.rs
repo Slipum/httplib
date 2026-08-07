@@ -2,36 +2,36 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::net::TcpStream;
 
-struct Header {
-    protocol: Option<String>, // Protocol like: HTTP/1.1 ...
-    Access_Control_Allow_Origin: Option<String>, // Cors
+pub (crate) struct Header {
+    pub(crate) protocol: Option<String>, // Protocol like: HTTP/1.1 ...
+    access_control_allow_origin: Option<String>, // Cors
 
-    Connection: Option<String>,
-    Content_Encoding: Option<Vec<String>>,
+    connection: Option<String>,
+    content_encoding: Option<Vec<String>>,
 
-    Content_Type: Option<Vec<String>>, // application/json, text/html or smth...
+    content_type: Option<Vec<String>>, // application/json, text/html or smth...
 
-    Date: Option<String>,
-    ETag: Option<String>,
-    Keep_Alive: Option<HashMap<String, i32>>,
-    Last_Modified: Option<String>,
-    Server: Option<String>,
-    Set_Cookie: Option<HashMap<String, String>>, // hashmap Cookie
-    Transfer_Encoding: Option<String>,
-    Vary: Option<Vec<String>>,
-    X_Backend_Server: Option<String>,
-    X_Cache_Info: Option<String>,
-    X_kuma_revision: Option<i32>,
+    date: Option<String>,
+    etag: Option<String>,
+    keep_alive: Option<HashMap<String, i32>>,
+    last_modified: Option<String>,
+    server: Option<String>,
+    set_cookie: Option<HashMap<String, String>>, // hashmap Cookie
+    transfer_encoding: Option<String>,
+    vary: Option<Vec<String>>,
+    x_backend_server: Option<String>,
+    x_cache_info: Option<String>,
+    x_kuma_revision: Option<i32>,
     x_frame_options: Option<String>,
 }
 
 pub struct Response {
-    code: i16,
-    phrase: Option<String>,
+    pub(crate) code: u16,
+    pub(crate) phrase: Option<String>,
 
-    header: Header,
+    pub(crate) header: Header,
 
-    body: Option<String>,
+    pub(crate) body: Option<String>,
 }
 
 impl Response {
@@ -52,21 +52,21 @@ impl Response {
             }
         };
 
-        add_header("Access-Control-Allow-Origin", &self.header.Access_Control_Allow_Origin);
-        add_header("Connection", &self.header.Connection);
-        add_header("Date", &self.header.Date);
-        add_header("Last-Modified", &self.header.Last_Modified);
-        add_header("Server", &self.header.Server);
-        add_header("Transfer-Encoding", &self.header.Transfer_Encoding);
-        add_header("X-Backend-Server", &self.header.X_Backend_Server);
-        add_header("X-Cache-Info", &self.header.X_Cache_Info);
+        add_header("Access-Control-Allow-Origin", &self.header.access_control_allow_origin);
+        add_header("Connection", &self.header.connection);
+        add_header("Date", &self.header.date);
+        add_header("Last-Modified", &self.header.last_modified);
+        add_header("Server", &self.header.server);
+        add_header("Transfer-Encoding", &self.header.transfer_encoding);
+        add_header("X-Backend-Server", &self.header.x_backend_server);
+        add_header("X-Cache-Info", &self.header.x_cache_info);
         add_header("X-Frame-Options", &self.header.x_frame_options);
 
-        if let Some(ref etag) = self.header.ETag {
+        if let Some(ref etag) = self.header.etag {
             res.push_str(&format!("ETag: \"{}\"\r\n", etag));
         }
 
-        if let Some(rev) = self.header.X_kuma_revision {
+        if let Some(rev) = self.header.x_kuma_revision {
             res.push_str(&format!("X-kuma-revision: {}\r\n", rev));
         }
 
@@ -75,11 +75,11 @@ impl Response {
                 res.push_str(&format!("{}: {}\r\n", name, vec.join(", ")));
             }
         };
-        add_vec_header("Content-Encoding", &self.header.Content_Encoding);
-        add_vec_header("Content-Type", &self.header.Content_Type);
-        add_vec_header("Vary", &self.header.Vary);
+        add_vec_header("Content-Encoding", &self.header.content_encoding);
+        add_vec_header("Content-Type", &self.header.content_type);
+        add_vec_header("Vary", &self.header.vary);
 
-        if let Some(ref keep_alive) = self.header.Keep_Alive {
+        if let Some(ref keep_alive) = self.header.keep_alive {
             let parts: Vec<String> = keep_alive
                 .iter()
                 .map(|(k, v)| format!("{}={}", k, v))
@@ -87,7 +87,7 @@ impl Response {
             res.push_str(&format!("Keep-Alive: {}\r\n", parts.join(", ")));
         }
 
-        if let Some(ref cookies) = self.header.Set_Cookie {
+        if let Some(ref cookies) = self.header.set_cookie {
             for (key, value) in cookies {
                 res.push_str(&format!("Set-Cookie: {}={}\r\n", key, value));
             }
@@ -101,63 +101,79 @@ impl Response {
         res
     }
 
-    pub fn set_phrase(&mut self, phrase: &str) {
+    pub fn set_phrase(mut self, phrase: &str) -> Response {
         self.phrase = Some(String::from(phrase));
+        self
     }
 
     pub fn write(&self, mut stream: &TcpStream) {
         stream.write(self.to_string().as_bytes()).expect("failed to write to socket");
     }
+
+    pub fn http1(mut self) -> Response {
+        self.header.protocol = Some("HTTP/1.1".to_string());
+        self
+    }
+
+    pub fn http2(mut self) -> Response {
+        self.header.protocol = Some("HTTP/2".to_string());
+        self
+    }
+
+    pub fn http3(mut self) -> Response {
+        self.header.protocol = Some("HTTP/3".to_string());
+        self
+    }
 }
 
-pub fn text(code: i16, body: &str) -> Response {
+pub fn text(code: u16, body: &str) -> Response {
     Response{
         code,
         phrase: None,
         header: Header {
             protocol: Some("HTTP/1.1".to_string()),
-            Access_Control_Allow_Origin: None,
-            Connection: None,
-            Content_Encoding: None,
-            Content_Type: Some(vec!["text/html".to_string()]),
-            Date: None,
-            ETag: None,
-            Keep_Alive: None,
-            Last_Modified: None,
-            Server: None,
-            Set_Cookie: None,
-            Transfer_Encoding: None,
-            Vary: None,
-            X_Backend_Server: None,
-            X_Cache_Info: None,
-            X_kuma_revision: None,
+            access_control_allow_origin: None,
+            connection: None,
+            content_encoding: None,
+            content_type: Some(vec!["text/html".to_string()]),
+            date: None,
+            etag: None,
+            keep_alive: None,
+            last_modified: None,
+            server: None,
+            set_cookie: None,
+            transfer_encoding: None,
+            vary: None,
+            x_backend_server: None,
+            x_cache_info: None,
+            x_kuma_revision: None,
             x_frame_options: None,
         },
         body: Some(body.trim().to_string()),
     }
 }
 
-pub fn json(code: i16, body: &str) -> Response {
+pub fn json(code: u16, body: &str) -> Response {
     Response{
         code,
         phrase: None,
         header: Header {
             protocol: Some("HTTP/1.1".to_string()),
-            Access_Control_Allow_Origin: None,
-            Connection: None,
-            Content_Encoding: None,
-            Content_Type: Some(vec!["application/json".to_string(), "charset=utf-8".to_string()]),
-            Date: None,
-            ETag: None,
-            Keep_Alive: None,
-            Last_Modified: None,
-            Server: None,
-            Set_Cookie: None,
-            Transfer_Encoding: None,
-            Vary: None,
-            X_Backend_Server: None,
-            X_Cache_Info: None,
-            X_kuma_revision: None,
+            access_control_allow_origin: None,
+            connection: None,
+            content_encoding: None,
+            content_type: Some(vec!["application/json".to_string(), "charset=utf-8".to_string()]),
+            date: None,
+            etag: None,
+            keep_alive: None,
+            last_modified: None,
+            server: None,
+            set_cookie: None,
+            transfer_encoding: None,
+            vary: None,
+            x_backend_server: None,
+            x_cache_info: None,
+            x_kuma_revision: None,
             x_frame_options: None,
         },
         body: Some(body.trim().to_string()),
