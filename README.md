@@ -106,7 +106,7 @@ fn handler_health(_request: &Request, _params: &[&str]) -> Response {
 }
 ```
 
-- Use json
+- Use JSON
 ```rust
 fn handler_hello(_request: &Request, _params: &[&str]) -> Response {
     let id = params.get(0).copied().unwrap_or("");
@@ -126,7 +126,7 @@ struct CreateUserPayload {
 }
 
 fn handler_creat_user(_request: &Request, params: &[&str]) -> Response {
-    match serde_json::from_str::<CreateUserPayload>(_request.GetBody().as_str()) {
+    match serde_json::from_str::<CreateUserPayload>(_request.get_body().as_str()) {
         Ok(user_data) => {
             let body = json!({ "message": format!("Create user with name: {}", user_data.name) }).to_string();
             response::json(201, &body)
