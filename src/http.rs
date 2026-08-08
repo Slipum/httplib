@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, ErrorKind, Read};
 use std::net::{TcpListener, TcpStream};
 use std::time::Duration;
 
@@ -111,72 +111,117 @@ impl Server {
 
         let mut reader = BufReader::new(&stream);
 
-        let mut lines: Vec<String> = Vec::new();
-        let mut content_length: Option<usize> = None;
-
-        const MAX_HEADER_LINES: usize = 100;
-        const MAX_LINE_LENGTH: usize = 8192;
-
         loop {
-            if lines.len() >= MAX_HEADER_LINES {
-                response::text(431, "Request Header Fields Too Large").write(&stream);
-                return;
-            }
+            let mut lines: Vec<String> = Vec::new();
+            let mut content_length: Option<usize> = None;
+            let mut close_requested = false;
+            let mut keep_alive_requested = false;
+            let mut is_http_1_0 = false;
 
-            let mut line = String::new();
-            let bytes_read = match reader.by_ref().take(MAX_LINE_LENGTH as u64).read_line(&mut line) {
-                Ok(0) => return,
-                Ok(n) => n,
-                Err(e) => {
-                    eprintln!("Failed to read from socket: {}", e);
+            const MAX_HEADER_LINES: usize = 100;
+            const MAX_LINE_LENGTH: usize = 8192;
+
+            loop {
+                if lines.len() >= MAX_HEADER_LINES {
+                    response::text(431, "Request Header Fields Too Large").write(&stream);
                     return;
                 }
-            };
 
-            if bytes_read >= MAX_LINE_LENGTH && !line.ends_with('\n') {
-                response::text(431, "Request Header Fields Too Large").write(&stream);
-                return;
-            }
-
-            if line == "\r\n" || line == "\n" {
-                break;
-            }
-
-            if line.to_lowercase().starts_with("content-length:") {
-                if let Some(val) = line.split(':').nth(1) {
-                    match val.trim().parse::<usize>() {
-                        Ok(len) => content_length = Some(len),
-                        Err(_) => {
-                            response::text(400, "Bad Request: Invalid Content-Length").write(&stream);
+                let mut line = String::new();
+                let bytes_read = match reader.by_ref().take(MAX_LINE_LENGTH as u64).read_line(&mut line) {
+                    Ok(0) => return,
+                    Ok(n) => n,
+                    Err(e) => {
+                        if (e.kind() == ErrorKind::TimedOut || e.kind() == ErrorKind::WouldBlock) && lines.is_empty() {
                             return;
+                        }
+
+                        if e.kind() == ErrorKind::TimedOut || e.kind() == ErrorKind::WouldBlock {
+                            response::text(408, "Request Timeout").write(&stream);
+                        } else {
+                            eprintln!("Failed to read from socket: {}", e);
+                        }
+                        return;
+                    }
+                };
+
+                if bytes_read >= MAX_LINE_LENGTH && !line.ends_with('\n') {
+                    response::text(431, "Request Header Fields Too Large").write(&stream);
+                    return;
+                }
+
+                if line == "\r\n" || line == "\n" {
+                    break;
+                }
+
+                let lower_line = line.to_lowercase();
+
+                if lines.is_empty() && lower_line.contains("http/1.0") {
+                    is_http_1_0 = true;
+                }
+
+                if lower_line.starts_with("content-length:") {
+                    if let Some(val) = line.split(':').nth(1) {
+                        match val.trim().parse::<usize>() {
+                            Ok(len) => content_length = Some(len),
+                            Err(_) => {
+                                response::text(400, "Bad Request: Invalid Content-Length").write(&stream);
+                                return;
+                            }
                         }
                     }
                 }
+
+                if lower_line.starts_with("connection:") {
+                    if let Some(val) = line.split(':').nth(1) {
+                        let conn_val = val.trim().to_lowercase();
+                        if conn_val.contains("close") {
+                            close_requested = true;
+                        }
+                        if conn_val.contains("keep-alive") {
+                            keep_alive_requested = true;
+                        }
+                    }
+                }
+
+                lines.push(line.trim_end().to_string());
             }
 
-            lines.push(line.trim_end().to_string());
-        }
+            let should_close = if is_http_1_0 {
+                !keep_alive_requested
+            } else {
+                close_requested
+            };
 
-        let content_length = content_length.unwrap_or(0);
+            let content_length = content_length.unwrap_or(0);
 
-        if content_length > self.max_body_size {
-            response::text(413, "Payload Too Large").write(&stream);
-            return;
-        }
-
-        let mut body_bytes = Vec::with_capacity(content_length);
-        if content_length > 0 {
-            if let Err(e) = reader.by_ref().take(content_length as u64).read_to_end(&mut body_bytes) {
-                eprintln!("Failed to read request body: {}", e);
-                response::text(400, "Bad Request: Incomplete Body").write(&stream);
+            if content_length > self.max_body_size {
+                response::text(413, "Payload Too Large").write(&stream);
                 return;
             }
+
+            let mut body_bytes = Vec::with_capacity(content_length);
+            if content_length > 0 {
+                if let Err(e) = reader.by_ref().take(content_length as u64).read_to_end(&mut body_bytes) {
+                    if e.kind() == ErrorKind::TimedOut || e.kind() == ErrorKind::WouldBlock {
+                        response::text(408, "Request Timeout: Slow Body").write(&stream);
+                    } else {
+                        eprintln!("Failed to read request body: {}", e);
+                        response::text(400, "Bad Request: Incomplete Body").write(&stream);
+                    }
+                    return;
+                }
+            }
+
+            let body_str = String::from_utf8_lossy(&body_bytes).to_string();
+            lines.push(body_str);
+
+            let lines_ref: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
+            self.dispatch(lines_ref, &stream);
+
+            if should_close {
+                break;
+            }
         }
-
-        let body_str = String::from_utf8_lossy(&body_bytes).to_string();
-        lines.push(body_str);
-
-        let lines_ref: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
-        self.dispatch(lines_ref, &stream);
     }
 }
