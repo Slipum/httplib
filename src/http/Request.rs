@@ -35,6 +35,24 @@ pub enum Method {
     TRACE,
 }
 
+use std::fmt;
+
+impl fmt::Display for Method {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let method_str = match self {
+            Method::GET => "GET",
+            Method::POST => "POST",
+            Method::PUT => "PUT",
+            Method::DELETE => "DELETE",
+            Method::PATCH => "PATCH",
+            Method::HEAD => "HEAD",
+            Method::OPTIONS => "OPTIONS",
+            Method::CONNECT => "CONNECT",
+            Method::TRACE => "TRACE",
+        };
+        write!(f, "{}", method_str)
+    }
+}
 
 struct Header {
     protocol: Option<String>, // Protocol like: HTTP/1.1 ...

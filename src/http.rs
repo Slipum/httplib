@@ -74,7 +74,14 @@ impl Server {
         let req: Request = request::from(&text);
         if self.logger_enabled {
             let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-            println!("[LOGGER] {} | {:?} {}", now, req.get_method(), req.get_route());
+            match req.get_method() {
+                Some(x) => {
+                    println!("[LOGGER] {} | {} {}", now, x, req.get_route());
+                },
+                None => {
+                    println!("[LOGGER] {} | {} {}", now, "Not available", req.get_route());
+                }
+            }
         }
 
         let http_route = req.get_route();
