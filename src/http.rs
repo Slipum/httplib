@@ -8,6 +8,7 @@ mod request;
 pub mod response;
 #[path = "http/Router.rs"]
 mod router;
+#[path = "http/Trie.rs"]
 mod trie;
 
 pub use request::{Request, Method};
