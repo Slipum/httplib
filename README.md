@@ -2,6 +2,8 @@
 
 Lightweight, synchronous, and multi-threaded Rust library for building fast HTTP servers from scratch.
 
+[More documentation](https://docs.rs/httplib/latest/httplib/)
+
 ## Instalation 
 
 - add to end `Cargo.toml`
