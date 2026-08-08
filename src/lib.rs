@@ -1,5 +1,47 @@
+//! # httplib
+//!
+//! Lightweight, synchronous, and multi-threaded Rust library for building fast HTTP servers from scratch.
+//!
+//! Built on top of the native standard library without the overhead of heavy async runtimes, it handles concurrency
+//! by spawning a dedicated OS thread per connection. This architecture provides excellent predictable performance
+//! for microservices, CLI tools, and embedded environments while keeping the code simple and free of `async/await` boilerplate.
+//!
+//! ## Quick Start
+//! ```rust
+//! use httplib::{Router, Method, Server, response};
+//!
+//! fn main() {
+//!     let mut router = Router::new();
+//!     router.add(Method::GET, "/", |_req, _params| {
+//!         response::text(200, "Hello from httplib!")
+//!     });
+//!
+//!     let server = Server::new("localhost", 8000)
+//!         .with_router(router)
+//!         .enable_logger();
+//!
+//!    server.start();
+//!
+//!     // Server will start listening on localhost:8000
+//!     // Server::new("localhost", 8000).with_router(router).start();
+//! }
+//! ```
+
 pub mod http;
-pub use http::{response, Method, Request, Response, Router, Server};
+
+#[doc(inline)]
+pub use http::Server;
+#[doc(inline)]
+pub use http::Router;
+#[doc(inline)]
+pub use http::Request;
+#[doc(inline)]
+pub use http::Response;
+#[doc(inline)]
+pub use http::Method;
+
+#[doc(inline)]
+pub use http::response;
 
 #[cfg(test)]
 mod tests {

@@ -2,11 +2,11 @@ use std::io::{BufRead, BufReader, Read};
 use std::net::{TcpListener, TcpStream};
 
 #[path = "http/Request.rs"]
-pub mod request;
+mod request;
 #[path = "http/Response.rs"]
 pub mod response;
 #[path = "http/Router.rs"]
-pub mod router;
+mod router;
 
 pub use request::{Request, Method};
 pub use router::Router;

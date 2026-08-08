@@ -1,3 +1,8 @@
+//! HTTP Response utilities and builders.
+//!
+//! This module provides the `Response` structure and shorthand functions
+//! like `text()` and `json()` to construct standard HTTP responses quickly.
+
 use std::collections::HashMap;
 use std::io::Write;
 use std::net::TcpStream;
@@ -110,16 +115,19 @@ impl Response {
         stream.write(self.to_string().as_bytes()).expect("failed to write to socket");
     }
 
+    /// Use `HTTP/1.1`
     pub fn http1(mut self) -> Response {
         self.header.protocol = Some("HTTP/1.1".to_string());
         self
     }
 
+    /// Use `HTTP/2`
     pub fn http2(mut self) -> Response {
         self.header.protocol = Some("HTTP/2".to_string());
         self
     }
 
+    /// Use `HTTP/3`
     pub fn http3(mut self) -> Response {
         self.header.protocol = Some("HTTP/3".to_string());
         self

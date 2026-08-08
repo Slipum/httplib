@@ -1,12 +1,27 @@
 use std::collections::HashMap;
+
+/// Supported HTTP methods for request routing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
+    /// The GET method requests a representation of the specified resource.
+    /// Requests using GET should only retrieve data.
     GET,
+
+    /// The POST method submits an entity to the specified resource,
+    /// often causing a change in state or side effects on the server.
     POST,
+
+    /// The DELETE method deletes the specified resource.
     DELETE,
+
+    /// The PUT method replaces all current representations of the target resource
+    /// with the request payload.
     PUT,
+
+    /// The PATCH method applies partial modifications to a resource.
     PATCH,
 }
+
 
 struct Header {
     protocol: Option<String>, // Protocol like: HTTP/1.1 ...
@@ -44,16 +59,6 @@ pub struct Request {
     query: HashMap<String, String>,
 }
 
-pub fn new() -> Request {
-    Request{
-        method: None,
-        route: None,
-        header: None,
-        body: None,
-        query: HashMap::new(),
-    }
-}
-
 pub fn from(req: &[impl AsRef<str>]) -> Request {
     parse_request(&req).expect("Failed to parse http request")
 }
@@ -75,6 +80,12 @@ impl Request {
         self.header?.protocol
     }
 
+    /// Returns the parsed query parameter value by its key.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let name = request.get_query("name").unwrap_or("Guest");
+    /// ```
     pub fn get_query(&self, key: &str) -> Option<&str> {
         self.query.get(key).map(|s| s.as_str())
     }
