@@ -48,7 +48,7 @@ fn main() {
 fn main() {
     let router = build_router();
 
-    let server = Server::new("0.0.0.0", 8000)
+    let server = Server::new("localhost", 8000)
         .with_router(router) // setup router
         .enable_logger(); // add logger
 
