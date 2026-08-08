@@ -9,7 +9,7 @@ Lightweight, synchronous, and multi-threaded Rust library for building fast HTTP
 - add to end `Cargo.toml`
 ```toml
 [dependencies]
-httplib = "1.2"
+httplib = "1.3"
 ```
 - or `bash` command
 ```bash
