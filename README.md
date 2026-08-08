@@ -8,18 +8,6 @@ Built on top of the native Rust standard library without the overhead of heavy `
 
 ---
 
-## Key Features & Advantages
-
-* **Zero Async Overhead:** Pure synchronous `thread-per-connection` model using standard library primitives. No complex async runtimes or hidden memory bloat.
-* **Fast Radix/Trie Tree Router:** $O(\text{path depth})$ route matching powered by a segment-based Trie tree (similar to `matchit`). Replaces slow $O(N)$ linear route scanning.
-* **Advanced Route Patterns:** Supports static segments, path parameters (`/user/{id}` or `/user/:id`), and wildcards / catch-all tails (`/static/{*filepath}`).
-* **Comprehensive HTTP Methods Support:** Full support for `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`, `CONNECT`, and `TRACE`.
-* **Allocation DoS Defense:** Prevents OOM attacks by strictly validating `Content-Length` and capping buffer allocations before reading request bodies.
-* **Slowloris & Header Flooding Protection:** Built-in read timeouts (`408 Request Timeout`) and strict boundaries on header size and count (`431 Request Header Fields Too Large`).
-* **Zero-Dependency Core:** Highly portable and ideal for microservices, CLI applications, embedded targets, and edge environments.
-
----
-
 ## Installation
 
 Add `httplib` to your `Cargo.toml`:
@@ -58,6 +46,19 @@ fn main() {
     server.start();
 }
 ```
+
+---
+
+## Key Features & Advantages
+
+* **Zero Async Overhead:** Pure synchronous `thread-per-connection` model using standard library primitives. No complex async runtimes or hidden memory bloat.
+* **Persistent Connections (HTTP Keep-Alive):** Full support for HTTP/1.1 and HTTP/1.0 connection reuse, reducing TCP handshake overhead with automatic idle timeouts and `Connection: close` handling.
+* **Fast Radix/Trie Tree Router:** $O(\text{path depth})$ route matching powered by a segment-based Trie tree (similar to `matchit`). Replaces slow $O(N)$ linear route scanning.
+* **Advanced Route Patterns:** Supports static segments, path parameters (`/user/{id}` or `/user/:id`), and wildcards / catch-all tails (`/static/{*filepath}`).
+* **Comprehensive HTTP Methods Support:** Full support for `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`, `CONNECT`, and `TRACE`.
+* **Allocation DoS Defense:** Prevents OOM attacks by strictly validating `Content-Length` and capping buffer allocations before reading request bodies.
+* **Slowloris & Header Flooding Protection:** Built-in read timeouts (`408 Request Timeout`) and strict boundaries on header size and count (`431 Request Header Fields Too Large`).
+* **Zero-Dependency Core:** Highly portable and ideal for microservices, CLI applications, embedded targets, and edge environments.
 
 ---
 
