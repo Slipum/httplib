@@ -44,7 +44,7 @@ impl Server {
     pub fn start(&self) {
         let listener = TcpListener::bind(format!("{}:{}", self.address, self.port)).unwrap();
         if self.logger_enabled {
-            println!("Listening on {}", listener.local_addr().unwrap());
+            println!("Listening on http://{}", listener.local_addr().unwrap());
         }
 
         for stream in listener.incoming() {
