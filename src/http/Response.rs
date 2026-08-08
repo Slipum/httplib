@@ -75,14 +75,14 @@ impl Response {
             res.push_str(&format!("X-kuma-revision: {}\r\n", rev));
         }
 
-        let mut add_vec_header = |name: &str, vec_opt: &Option<Vec<String>>| {
+        let mut add_vec_header = |name: &str, vec_opt: &Option<Vec<String>>, delimiter: &str| {
             if let Some(vec) = vec_opt {
-                res.push_str(&format!("{}: {}\r\n", name, vec.join(", ")));
+                res.push_str(&format!("{}: {}\r\n", name, vec.join(delimiter)));
             }
         };
-        add_vec_header("Content-Encoding", &self.header.content_encoding);
-        add_vec_header("Content-Type", &self.header.content_type);
-        add_vec_header("Vary", &self.header.vary);
+        add_vec_header("Content-Encoding", &self.header.content_encoding, ", ");
+        add_vec_header("Content-Type", &self.header.content_type, "; ");
+        add_vec_header("Vary", &self.header.vary, ", ");
 
         if let Some(ref keep_alive) = self.header.keep_alive {
             let parts: Vec<String> = keep_alive

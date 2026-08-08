@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 /// Supported HTTP methods for request routing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Method {
     /// The GET method requests a representation of the specified resource.
     /// Requests using GET should only retrieve data.
@@ -20,6 +20,19 @@ pub enum Method {
 
     /// The PATCH method applies partial modifications to a resource.
     PATCH,
+
+    /// The HEAD method asks for a response identical to a GET request,
+    /// but without the response body.
+    HEAD,
+
+    /// The OPTIONS method describes the communication options for the target resource.
+    OPTIONS,
+
+    /// The CONNECT method establishes a tunnel to the server identified by the target resource.
+    CONNECT,
+
+    /// The TRACE method performs a message loop-back test along the path to the target resource.
+    TRACE,
 }
 
 
@@ -64,16 +77,16 @@ pub fn from(req: &[impl AsRef<str>]) -> Request {
 }
 
 impl Request {
-    pub fn get_route(&self) -> String {
-        String::from(self.route.as_ref().unwrap())
+    pub fn get_route(&self) -> &str {
+        self.route.as_deref().unwrap_or_default()
     }
 
     pub fn get_method(&self) -> Method {
         self.method.expect("Method not set")
     }
 
-    pub fn get_body(&self) -> String {
-        String::from(self.body.as_ref().unwrap())
+    pub fn get_body(&self) -> &str {
+        self.body.as_deref().unwrap_or_default()
     }
 
     pub fn get_protocol(self) -> Option<String> {
@@ -82,9 +95,16 @@ impl Request {
 
     /// Returns the parsed query parameter value by its key.
     ///
+    /// Route: `/user?name=Nickname`
     /// # Examples
     /// ```rust
-    /// let name = request.get_query("name").unwrap_or("Guest");
+    /// use httplib::{response, Response, Request};
+    ///
+    /// fn handle_name(_request: &Request, _params: &[&str]) -> Response {
+    ///     let name = _request.get_query("name").unwrap_or("Guest");
+    ///
+    ///     response::text(200, &format!("User with name: {name}").to_string())
+    /// }
     /// ```
     pub fn get_query(&self, key: &str) -> Option<&str> {
         self.query.get(key).map(|s| s.as_str())

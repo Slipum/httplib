@@ -1,5 +1,6 @@
 use std::io::{BufRead, BufReader, Read};
 use std::net::{TcpListener, TcpStream};
+use std::time::Duration;
 
 #[path = "http/Request.rs"]
 mod request;
@@ -7,6 +8,7 @@ mod request;
 pub mod response;
 #[path = "http/Router.rs"]
 mod router;
+mod trie;
 
 pub use request::{Request, Method};
 pub use router::Router;
@@ -19,15 +21,22 @@ pub struct Server {
 
     router: Router,
     logger_enabled: bool,
+    max_body_size: usize,
 }
 
 impl Server {
+    pub fn with_max_body_size(mut self, size: usize) -> Self {
+        self.max_body_size = size;
+        self
+    }
+
     pub fn new(address: &str, port: u16) -> Self {
         Server {
             address: address.to_string(),
             port,
             router: Router::new(),
             logger_enabled: false,
+            max_body_size: 10 * 1024 * 1024,
         }
     }
 
@@ -73,7 +82,7 @@ impl Server {
             Some((path, _query_string)) => {
                 path
             }
-            None => http_route.as_str(),
+            None => http_route,
         };
 
         let path_parts: Vec<&str> = clean_route
@@ -94,39 +103,71 @@ impl Server {
     }
 
     fn client(&self, stream: TcpStream) {
+        if let Err(e) = stream.set_read_timeout(Some(Duration::from_secs(15))) {
+            eprintln!("Failed to set read timeout: {}", e);
+            return;
+        }
+
         let mut reader = BufReader::new(&stream);
 
         let mut lines: Vec<String> = Vec::new();
-        let mut content_length: usize = 0;
+        let mut content_length: Option<usize> = None;
+
+        const MAX_HEADER_LINES: usize = 100;
+        const MAX_LINE_LENGTH: usize = 8192;
 
         loop {
+            if lines.len() >= MAX_HEADER_LINES {
+                response::text(431, "Request Header Fields Too Large").write(&stream);
+                return;
+            }
+
             let mut line = String::new();
-            match reader.read_line(&mut line) {
-                Ok(0) => return, // Соединение закрыто
-                Ok(_) => {
-                    if line == "\r\n" || line == "\n" {
-                        break;
-                    }
-
-                    if line.to_lowercase().starts_with("content-length:") {
-                        if let Some(val) = line.split(':').nth(1) {
-                            content_length = val.trim().parse().unwrap_or(0);
-                        }
-                    }
-
-                    lines.push(line.trim_end().to_string());
-                }
+            let bytes_read = match reader.by_ref().take(MAX_LINE_LENGTH as u64).read_line(&mut line) {
+                Ok(0) => return,
+                Ok(n) => n,
                 Err(e) => {
                     eprintln!("Failed to read from socket: {}", e);
                     return;
                 }
+            };
+
+            if bytes_read >= MAX_LINE_LENGTH && !line.ends_with('\n') {
+                response::text(431, "Request Header Fields Too Large").write(&stream);
+                return;
             }
+
+            if line == "\r\n" || line == "\n" {
+                break;
+            }
+
+            if line.to_lowercase().starts_with("content-length:") {
+                if let Some(val) = line.split(':').nth(1) {
+                    match val.trim().parse::<usize>() {
+                        Ok(len) => content_length = Some(len),
+                        Err(_) => {
+                            response::text(400, "Bad Request: Invalid Content-Length").write(&stream);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            lines.push(line.trim_end().to_string());
         }
 
-        let mut body_bytes = vec![0u8; content_length];
+        let content_length = content_length.unwrap_or(0);
+
+        if content_length > self.max_body_size {
+            response::text(413, "Payload Too Large").write(&stream);
+            return;
+        }
+
+        let mut body_bytes = Vec::with_capacity(content_length);
         if content_length > 0 {
-            if let Err(e) = reader.read_exact(&mut body_bytes) {
+            if let Err(e) = reader.by_ref().take(content_length as u64).read_to_end(&mut body_bytes) {
                 eprintln!("Failed to read request body: {}", e);
+                response::text(400, "Bad Request: Incomplete Body").write(&stream);
                 return;
             }
         }

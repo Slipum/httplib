@@ -8,7 +8,7 @@ struct CreateUserPayload {
 }
 
 fn handler_creat_user(_request: &Request, _params: &[&str]) -> Response {
-    match serde_json::from_str::<CreateUserPayload>(_request.get_body().as_str()) {
+    match serde_json::from_str::<CreateUserPayload>(_request.get_body()) {
         Ok(user_data) => {
             let body = json!({ "message": format!("Create user with name: {}", user_data.name) }).to_string();
             response::json(201, &body)
