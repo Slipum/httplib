@@ -4,12 +4,12 @@ Lightweight, synchronous, and multi-threaded Rust library for building fast HTTP
 
 ## Instalation 
 
-- `Cargo.toml`
+- add to end `Cargo.toml`
 ```toml
 [dependencies]
 httplib = "1.2"
 ```
-or
+- or `bash` command
 ```bash
 cargo add httplib
 ```
