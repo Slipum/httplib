@@ -92,7 +92,15 @@ impl Server {
             .filter(|s| !s.is_empty())
             .collect();
 
-        match self.router.find(req.get_method(), &path_parts) {
+        let method = match req.get_method() {
+            Some(met) => met,
+            None => {
+                response::text(405, "Method Not Allowed").write(&stream);
+                return;
+            }
+        };
+
+        match self.router.find(method, &path_parts) {
             Some((handler, params)) => {
                 let params_refs: Vec<&str> = params.iter().map(|s| s.as_str()).collect();
                 handler(&req, &params_refs).write(&stream);

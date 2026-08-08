@@ -81,8 +81,8 @@ impl Request {
         self.route.as_deref().unwrap_or_default()
     }
 
-    pub fn get_method(&self) -> Method {
-        self.method.expect("Method not set")
+    pub fn get_method(&self) -> Option<Method> {
+        self.method
     }
 
     pub fn get_body(&self) -> &str {
@@ -118,9 +118,11 @@ fn parse_request(text: &[impl AsRef<str>]) -> Option<Request> {
 
     let mut start = text[0].as_ref().split_whitespace();
 
-    let method = start.next()?.to_string();
+    let method_str = start.next()?.to_string();
     let raw_route = start.next()?.to_string();
     let protocol = start.next()?.to_string();
+
+    let method = parse_method(method_str);
 
     let (route, query_map) = match raw_route.split_once('?') {
         Some((path, query_str)) => (path.to_string(), parse_query(query_str)),
@@ -179,7 +181,7 @@ fn parse_request(text: &[impl AsRef<str>]) -> Option<Request> {
     }
 
     Some(Request{
-        method: Some(parse_method(method)),
+        method,
         route: Some(route),
         header: Some(header),
         body: Some(text.last()?.as_ref().to_string()),
@@ -187,13 +189,18 @@ fn parse_request(text: &[impl AsRef<str>]) -> Option<Request> {
     })
 }
 
-fn parse_method(method: impl AsRef<str>) -> Method {
+fn parse_method(method: impl AsRef<str>) -> Option<Method> {
     match method.as_ref() {
-        "POST" => Method::POST,
-        "PUT" => Method::PUT,
-        "DELETE" => Method::DELETE,
-        "PATCH" => Method::PATCH,
-        _ => Method::GET
+        "GET" => Some(Method::GET),
+        "POST" => Some(Method::POST),
+        "PUT" => Some(Method::PUT),
+        "DELETE" => Some(Method::DELETE),
+        "PATCH" => Some(Method::PATCH),
+        "OPTIONS" => Some(Method::OPTIONS),
+        "HEAD" => Some(Method::HEAD),
+        "TRACE" => Some(Method::TRACE),
+        "CONNECT" => Some(Method::CONNECT),
+        _ => None,
     }
 }
 
