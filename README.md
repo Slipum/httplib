@@ -1,34 +1,55 @@
 # httplib
 
-Lightweight, synchronous, and multi-threaded Rust library for building fast HTTP servers from scratch.
+Lightweight, synchronous, and multi-threaded Rust library for building fast, secure HTTP servers from scratch.
 
-[More documentation](https://docs.rs/httplib/latest/httplib/)
+Built on top of the native Rust standard library without the overhead of heavy `async` runtimes, `httplib` handles concurrency by spawning a dedicated OS thread per connection. It provides predictable performance, low memory footprint, and robust built-in security features while keeping the codebase simple and free of `async/await` boilerplate.
 
-## Instalation 
+[Full Documentation on docs.rs](https://docs.rs/httplib/latest/httplib/)
 
-- add to end `Cargo.toml`
+---
+
+## Key Features & Advantages
+
+* **Zero Async Overhead:** Pure synchronous `thread-per-connection` model using standard library primitives. No complex async runtimes or hidden memory bloat.
+* **Fast Radix/Trie Tree Router:** $O(\text{path depth})$ route matching powered by a segment-based Trie tree (similar to `matchit`). Replaces slow $O(N)$ linear route scanning.
+* **Advanced Route Patterns:** Supports static segments, path parameters (`/user/{id}` or `/user/:id`), and wildcards / catch-all tails (`/static/{*filepath}`).
+* **Comprehensive HTTP Methods Support:** Full support for `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`, `CONNECT`, and `TRACE`.
+* **Allocation DoS Defense:** Prevents OOM attacks by strictly validating `Content-Length` and capping buffer allocations before reading request bodies.
+* **Slowloris & Header Flooding Protection:** Built-in read timeouts (`408 Request Timeout`) and strict boundaries on header size and count (`431 Request Header Fields Too Large`).
+* **Zero-Dependency Core:** Highly portable and ideal for microservices, CLI applications, embedded targets, and edge environments.
+
+---
+
+## Installation
+
+Add `httplib` to your `Cargo.toml`:
+
 ```toml
 [dependencies]
 httplib = "1.3"
+
 ```
-- or `bash` command
+
+Or run via Cargo CLI:
+
 ```bash
 cargo add httplib
 ```
 
-## Quick start
+---
 
-`main.rs`
+## Quick Start
+
 ```rust
-use httplib::{Server, Router, Request, Response, Method, response};
+use httplib::{response, Method, Request, Response, Router, Server};
 
-fn handler_health(_request: &Request, _params: &[&str]) -> Response {
+fn handler_hello(_request: &Request, _params: &[&str]) -> Response {
     response::text(200, "Hello from httplib!")
 }
 
 fn main() {
     let mut router = Router::new();
-    router.add(Method::GET, "/hello", handler_health);
+    router.add(Method::GET, "/hello", handler_hello);
 
     let server = Server::new("localhost", 7878)
         .with_router(router)
@@ -38,112 +59,112 @@ fn main() {
 }
 ```
 
-## Examples
+---
 
-[View examples](examples/)
+## Router Features & Path Matching
 
-### Server
-
-```rust
-fn main() {
-    let router = build_router();
-
-    let server = Server::new("localhost", 8000)
-        .with_router(router) // setup router
-        .enable_logger(); // add logger
-
-    server.start();
-}
-```
-
-### Router
+`httplib` utilizes a Trie-based router with strict priority rules: **Static > Parameters > Wildcards**.
 
 ```rust
 fn build_router() -> Router {
     let mut router = Router::new();
+    
     router
-        .add(Method::GET, "/ping", handler_health)
-        .add(Method::GET, "/hello", handler_hello)
-        .add(Method::POST, "/user", handler_creat_user)
-        .add(Method::GET, "/user/{id}", handler_get_user);
+        // Static route
+        .add(Method::GET, "/ping", handler_ping)
+        
+        // Named parameter route (/user/123 -> params[0] = "123")
+        .add(Method::GET, "/user/{id}", handler_get_user)
+        
+        // Multiple parameter route
+        .add(Method::PUT, "/posts/{category}/{id}", handler_update_post)
+        
+        // Catch-all / Wildcard route (/static/css/style.css -> params[0] = "css/style.css")
+        .add(Method::GET, "/static/{*filepath}", handler_static_files);
+
     router
 }
 ```
 
-> Supported method of http: 
-```md
-    GET,
-    POST,
-    DELETE,
-    PUT,
-    PATCH,
-```
+### Supported HTTP Methods
 
-### Handles
-
-> Basic 
-
-- text `response::text(<status_code>, <text>)`
-- json `response::json(<status_code>, <json_to_string>)`
-- handle:
-```rust
-fn handle_name(_request: &Request, _params: &[&str]) -> Response {
-    ...
-}
-```
-
-### Route params
-
-```rust
-let name = _request.get_query("name").unwrap_or("");
-let id = params.get(0).copied().unwrap_or("");
-```
+| Method | Enum Variant | Typical Usage |
+| --- | --- | --- |
+| `GET` | `Method::GET` | Retrieve resource representation |
+| `POST` | `Method::POST` | Create resource or process payload |
+| `PUT` | `Method::PUT` | Replace resource completely |
+| `DELETE` | `Method::DELETE` | Remove specified resource |
+| `PATCH` | `Method::PATCH` | Apply partial modifications |
+| `HEAD` | `Method::HEAD` | Fetch headers identical to `GET` without body |
+| `OPTIONS` | `Method::OPTIONS` | Describe target communication options (CORS) |
+| `CONNECT` | `Method::CONNECT` | Establish tunnel connection |
+| `TRACE` | `Method::TRACE` | Perform loop-back test |
 
 ---
 
-- Use text
+## Handling Requests & Responses
+
+### Query Parameters & Path Params
+
 ```rust
-fn handler_health(_request: &Request, _params: &[&str]) -> Response {
-    response::text(200, "pong")
+fn handler_get_user(request: &Request, params: &[&str]) -> Response {
+    // Extract path parameter (e.g. /user/{id})
+    let user_id = params.get(0).copied().unwrap_or("0");
+
+    // Extract query parameter (e.g. /user/123?format=full)
+    let format = request.get_query("format").unwrap_or("standard");
+
+    let response_body = format!(r#"{{"user_id": "{user_id}", "format": "{format}"}}"#);
+    response::json(200, &response_body)
 }
+
 ```
 
-- Use JSON
-```rust
-fn handler_hello(_request: &Request, _params: &[&str]) -> Response {
-    let id = params.get(0).copied().unwrap_or("");
-    // let body = json!({ "user": id }).to_string(); // use lib `serde_json::json;`
-    let body = format!("{{ \"user\": \"{id}\" }}"); // without json lib
+### Working with JSON Payloads
 
-    response::json(200, &body)
-}
-```
-
-- Post with json
 ```rust
+use serde::Deserialize;
+use serde_json::json;
 
 #[derive(Deserialize)]
 struct CreateUserPayload {
     name: String,
 }
 
-fn handler_creat_user(_request: &Request, params: &[&str]) -> Response {
-    match serde_json::from_str::<CreateUserPayload>(_request.get_body().as_str()) {
-        Ok(user_data) => {
-            let body = json!({ "message": format!("Create user with name: {}", user_data.name) }).to_string();
+fn handler_create_user(request: &Request, _params: &[&str]) -> Response {
+    match serde_json::from_str::<CreateUserPayload>(request.get_body().as_str()) {
+        Ok(payload) => {
+            let body = json!({
+                "status": "success",
+                "message": format!("Created user: {}", payload.name)
+            }).to_string();
+
             response::json(201, &body)
         }
         Err(e) => {
-            let body = json!({ "message": format!("Error with create user: {}", e) }).to_string();
+            let body = json!({
+                "error": "Invalid JSON payload",
+                "details": e.to_string()
+            }).to_string();
+
             response::json(400, &body)
         }
     }
 }
+
 ```
 
-> use for json 
-```toml
-[dependencies]
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-```
+---
+
+## Built-In Security & Protection Mechanisms
+
+`httplib` includes built-in safeguards against common HTTP vulnerability vectors:
+
+* **Resource Exhaustion (OOM) Protection:** Incoming `Content-Length` headers are validated against `max_body_size` (10 MB by default) prior to heap allocation. Initial vector capacities are capped at small bounds (`64 KB`) and reallocated safely on demand during streaming.
+* **Header DoS Guard:** Enforces strict limits on maximum header count (100 lines) and individual line length (8 KB) to prevent unbounded memory consumption from malicious request headers.
+* **Slowloris Defense:** Configurable read timeouts (`408 Request Timeout`) on underlying TCP streams automatically drop stalled or intentionally slow connection attempts.
+* **Strict Header Validation:** Non-numeric or malformed `Content-Length` values are rejected with `400 Bad Request` to prevent Request Smuggling vulnerabilities.
+
+## Examples
+
+Explore full server examples in the [`examples/`](examples) directory.
