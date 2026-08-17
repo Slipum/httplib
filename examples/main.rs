@@ -8,7 +8,7 @@ fn main() {
     let mut router = Router::new();
     router.add(Method::GET, "/", handler_health);
 
-    let server = Server::new("localhost", 7878)
+    let server = Server::new("0.0.0.0", 7878)
         .with_router(router)
         .enable_logger();
 

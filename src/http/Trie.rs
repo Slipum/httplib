@@ -65,7 +65,6 @@ impl Node {
                 let (_, child) = self
                     .catch_all_child
                     .get_or_insert_with(|| (param_name, Box::new(Node::new())));
-                // Catch-all поглощает все оставшиеся сегменты
                 child.handlers.insert(method, handler);
             }
         }
@@ -92,25 +91,21 @@ impl Node {
 
         let current_part = path_parts[0];
 
-        // Приоритет 1: Точное статическое совпадение (статические пути выше динамических)
         if let Some(child) = self.static_children.get(current_part) {
             if let Some(handler) = child.match_path(method, &path_parts[1..], params) {
                 return Some(handler);
             }
         }
 
-        // Приоритет 2: Одиночный параметр {id} или :id
         if let Some((_name, child)) = &self.param_child {
             params.push(current_part.to_string());
             if let Some(handler) = child.match_path(method, &path_parts[1..], params) {
                 return Some(handler);
             }
-            params.pop(); // Бэктрекинг в случае неудачи дальше по ветке
+            params.pop();
         }
 
-        // Приоритет 3: Catch-all хвост {*rest}
         if let Some((_name, child)) = &self.catch_all_child {
-            // Объединяем все оставшиеся сегменты через "/"
             let rest_path = path_parts.join("/");
             params.push(rest_path);
 
