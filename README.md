@@ -14,7 +14,7 @@ Add `httplib` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-httplib = "1.3"
+httplib = "*"
 
 ```
 
@@ -31,17 +31,19 @@ cargo add httplib
 ```rust
 use httplib::{response, Method, Request, Response, Router, Server};
 
-fn handler_hello(_request: &Request, _params: &[&str]) -> Response {
+fn handler_hello(_request: &Request<()>, _params: &[&str]) -> Response {
     response::text(200, "Hello from httplib!")
 }
 
 fn main() {
-    let mut router = Router::new();
-    router.add(Method::GET, "/hello", handler_hello);
+    let mut router = Router::<()>::new();
+    router.add(Method::GET, "/", handler_hello);
 
-    let server = Server::new("0.0.0.0", 7878)
-        .with_router(router)
-        .enable_logger();
+    let server = Server::builder()
+        .port(7878)
+        .router(router)
+        .enable_logger()
+        .build();
 
     server.start();
 }
@@ -67,7 +69,7 @@ fn main() {
 `httplib` utilizes a Trie-based router with strict priority rules: **Static > Parameters > Wildcards**.
 
 ```rust
-fn build_router() -> Router {
+fn build_router() -> Router::<()> {
     let mut router = Router::new();
     
     router
@@ -108,7 +110,7 @@ fn build_router() -> Router {
 ### Query Parameters & Path Params
 
 ```rust
-fn handler_get_user(request: &Request, params: &[&str]) -> Response {
+fn handler_get_user(request: &Request<()>, params: &[&str]) -> Response {
     // Extract path parameter (e.g. /user/{id})
     let user_id = params.get(0).copied().unwrap_or("0");
 
@@ -118,7 +120,6 @@ fn handler_get_user(request: &Request, params: &[&str]) -> Response {
     let response_body = format!(r#"{{"user_id": "{user_id}", "format": "{format}"}}"#);
     response::json(200, &response_body)
 }
-
 ```
 
 ### Working with JSON Payloads
@@ -132,7 +133,7 @@ struct CreateUserPayload {
     name: String,
 }
 
-fn handler_create_user(request: &Request, _params: &[&str]) -> Response {
+fn handler_create_user(request: &Request<()>, _params: &[&str]) -> Response {
     match serde_json::from_str::<CreateUserPayload>(request.get_body().as_str()) {
         Ok(payload) => {
             let body = json!({
@@ -152,7 +153,6 @@ fn handler_create_user(request: &Request, _params: &[&str]) -> Response {
         }
     }
 }
-
 ```
 
 ---

@@ -11,19 +11,18 @@
 //! use httplib::{Router, Method, Server, response};
 //!
 //! fn main() {
-//!     let mut router = Router::new();
+//!     let mut router = Router::<()>::new();
 //!     router.add(Method::GET, "/", |_req, _params| {
 //!         response::text(200, "Hello from httplib!")
 //!     });
 //!
-//!     let server = Server::new("localhost", 8000)
-//!         .with_router(router)
-//!         .enable_logger();
+//!     let server = Server::builder()
+//!             .port(7878)
+//!             .router(router)
+//!             .enable_logger()
+//!             .build();
 //!
 //!    server.start();
-//!
-//!     // Server will start listening on localhost:8000
-//!     // Server::new("localhost", 8000).with_router(router).start();
 //! }
 //! ```
 
@@ -97,13 +96,16 @@ mod tests {
 
     #[test]
     fn test_huge_content_length_does_not_hang_or_alloc() {
-        let mut router = Router::new();
+        let mut router = Router::<()>::new();
         router.add(Method::POST, "/upload", |_req, _params| {
             response::text(200, "OK")
         });
 
-        let port = 18080;
-        let server = Server::new("127.0.0.1", port).with_router(router);
+        let server = Server::builder()
+            .port(7878)
+            .router(router)
+            .enable_logger()
+            .build();
 
         thread::spawn(move || {
             server.start();
@@ -112,7 +114,7 @@ mod tests {
         thread::sleep(Duration::from_millis(100));
 
         let mut stream =
-            TcpStream::connect(("127.0.0.1", port)).expect("Не удалось подключиться к серверу");
+            TcpStream::connect(("127.0.0.1", 7878)).expect("Не удалось подключиться к серверу");
 
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
@@ -147,5 +149,47 @@ mod tests {
                 println!("Сервер корректно сбросил соединение: {:?}", e.kind());
             }
         }
+    }
+
+    #[test]
+    fn test_http_endpoint_integration() {
+        let mut router = Router::<()>::new();
+        router.add(Method::GET, "/ping", |_req, _params| {
+            response::text(200, "pong").set_phrase("OK")
+        });
+
+        let port: u16 = 15001;
+        let server = Server::builder()
+            .address("127.0.0.1") // Явно указываем IP адрес
+            .port(port)
+            .router(router)
+            .max_body_size(1024)
+            .build();
+
+        thread::spawn(move || {
+            server.start();
+        });
+
+        thread::sleep(Duration::from_millis(150));
+
+        let mut stream = TcpStream::connect(("127.0.0.1", port))
+            .expect("Не удалось подключиться к серверу");
+
+        stream.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+
+        let req = "GET /ping HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+
+        stream.write_all(req.as_bytes()).unwrap();
+        stream.flush().unwrap();
+
+        let mut resp = String::new();
+        let _ = stream.read_to_string(&mut resp);
+
+        assert!(
+            resp.contains("200 OK"),
+            "Сервер вернул неожиданный ответ:\n'{}'",
+            resp
+        );
+        assert!(resp.contains("pong"));
     }
 }

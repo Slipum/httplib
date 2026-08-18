@@ -79,7 +79,7 @@ struct Header {
     priority: Option<String>,
 }
 
-pub struct Request {
+pub struct Request <T> {
     method: Option<Method>,
     route: Option<String>,
 
@@ -88,13 +88,15 @@ pub struct Request {
     body: Option<String>,
 
     query: HashMap<String, String>,
+
+    app_state: T,
 }
 
-pub fn from(req: &[impl AsRef<str>]) -> Request {
-    parse_request(&req).expect("Failed to parse http request")
+pub fn from<T: Clone>(req: &[impl AsRef<str>], state: T) -> Request<T> {
+    parse_request(req, state).expect("Failed to parse http request")
 }
 
-impl Request {
+impl<T> Request<T> {
     pub fn get_route(&self) -> &str {
         self.route.as_deref().unwrap_or_default()
     }
@@ -118,7 +120,7 @@ impl Request {
     /// ```rust
     /// use httplib::{response, Response, Request};
     ///
-    /// fn handle_name(_request: &Request, _params: &[&str]) -> Response {
+    /// fn handle_name(_request: &Request<()>, _params: &[&str]) -> Response {
     ///     let name = _request.get_query("name").unwrap_or("Guest");
     ///
     ///     response::text(200, &format!("User with name: {name}").to_string())
@@ -127,9 +129,13 @@ impl Request {
     pub fn get_query(&self, key: &str) -> Option<&str> {
         self.query.get(key).map(|s| s.as_str())
     }
+
+    pub fn state(&self) -> &T {
+        &self.app_state
+    }
 }
 
-fn parse_request(text: &[impl AsRef<str>]) -> Option<Request> {
+fn parse_request<T: Clone>(text: &[impl AsRef<str>], state: T) -> Option<Request<T>> {
     if text.is_empty() {
         return None;
     }
@@ -204,6 +210,7 @@ fn parse_request(text: &[impl AsRef<str>]) -> Option<Request> {
         header: Some(header),
         body: Some(text.last()?.as_ref().to_string()),
         query: query_map,
+        app_state: state,
     })
 }
 

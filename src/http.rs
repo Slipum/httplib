@@ -15,30 +15,57 @@ pub use request::{Request, Method};
 pub use router::Router;
 pub use response::Response;
 
-#[derive(Clone, Default)]
-pub struct Server {
+#[derive(Clone)]
+pub struct Server<T> {
     address: String,
     port: u16,
 
-    router: Router,
+    router: Router<T>,
+    logger_enabled: bool,
+    max_body_size: usize,
+
+    app_state: T,
+}
+
+pub struct ServerBuilder<T> {
+    address: String,
+    port: u16,
+    router: Option<Router<T>>,
+    app_state: Option<T>,
     logger_enabled: bool,
     max_body_size: usize,
 }
 
-impl Server {
-    pub fn with_max_body_size(mut self, size: usize) -> Self {
-        self.max_body_size = size;
-        self
-    }
-
-    pub fn new(address: &str, port: u16) -> Self {
-        Server {
-            address: address.to_string(),
-            port,
-            router: Router::new(),
+impl<T> ServerBuilder<T> {
+    pub fn new() -> Self {
+        Self {
+            address: "0.0.0.0".to_string(),
+            port: 7878,
+            router: None,
+            app_state: None,
             logger_enabled: false,
             max_body_size: 10 * 1024 * 1024,
         }
+    }
+
+    pub fn address(mut self, address: impl Into<String>) -> Self {
+        self.address = address.into();
+        self
+    }
+
+    pub fn port(mut self, port: u16) -> Self {
+        self.port = port;
+        self
+    }
+
+    pub fn router(mut self, router: Router<T>) -> Self {
+        self.router = Some(router);
+        self
+    }
+
+    pub fn state(mut self, state: T) -> Self {
+        self.app_state = Some(state);
+        self
     }
 
     pub fn enable_logger(mut self) -> Self {
@@ -46,7 +73,36 @@ impl Server {
         self
     }
 
-    pub fn with_router(mut self, router: Router) -> Self {
+    pub fn max_body_size(mut self, size: usize) -> Self {
+        self.max_body_size = size;
+        self
+    }
+}
+
+impl<T: Default> ServerBuilder<T> {
+    pub fn build(self) -> Server<T> {
+        Server {
+            address: self.address,
+            port: self.port,
+            router: self.router.unwrap_or_default(),
+            app_state: self.app_state.unwrap_or_default(),
+            logger_enabled: self.logger_enabled,
+            max_body_size: self.max_body_size,
+        }
+    }
+}
+
+impl<T: Clone + Send + Sync + 'static> Server<T> {
+    pub fn builder() -> ServerBuilder<T> {
+        ServerBuilder::new()
+    }
+
+    pub fn enable_logger(mut self) -> Self {
+        self.logger_enabled = true;
+        self
+    }
+
+    pub fn with_router(mut self, router: Router<T>) -> Self {
         self.router = router;
         self
     }
@@ -71,7 +127,7 @@ impl Server {
     }
 
     fn dispatch(&self, text: Vec<&str>, stream: &TcpStream) {
-        let req: Request = request::from(&text);
+        let req: Request<T> = request::from(&text,self.app_state.clone());
         if self.logger_enabled {
             let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
             match req.get_method() {

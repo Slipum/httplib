@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::{Method, Request, Response};
 
-pub type Handler = fn(&Request, &[&str]) -> Response;
+pub type Handler<T> = fn(&Request<T>, &[&str]) -> Response;
 
 
 #[derive(Debug, Clone)]enum Segment {
@@ -27,20 +27,30 @@ fn parse_segment(s: &str) -> Segment {
     }
 }
 
-#[derive(Clone, Default)]
-pub struct Node {
-    handlers: HashMap<Method, Handler>,
-    static_children: HashMap<String, Node>,
-    param_child: Option<(String, Box<Node>)>,
-    catch_all_child: Option<(String, Box<Node>)>,
+#[derive(Clone)]
+pub struct Node<T> {
+    handlers: HashMap<Method, Handler<T>>,
+    static_children: HashMap<String, Node<T>>,
+    param_child: Option<(String, Box<Node<T>>)>,
+    catch_all_child: Option<(String, Box<Node<T>>)>,
 }
 
-impl Node {
+impl<T> Default for Node<T> {
+    fn default() -> Self {
+        Self {
+            handlers: HashMap::new(),
+            static_children: HashMap::new(),
+            param_child: None,
+            catch_all_child: None,
+        }
+    }
+}
+
+impl<T> Node<T> {
     pub fn new() -> Self {
         Self::default()
     }
-
-    pub fn insert(&mut self, method: Method, path_parts: &[&str], handler: Handler) {
+    pub fn insert(&mut self, method: Method, path_parts: &[&str], handler: Handler<T>) {
         if path_parts.is_empty() {
             self.handlers.insert(method, handler);
             return;
@@ -70,7 +80,7 @@ impl Node {
         }
     }
 
-    pub fn find(&self, method: Method, path_parts: &[&str]) -> Option<(Handler, Vec<String>)> {
+    pub fn find(&self, method: Method, path_parts: &[&str]) -> Option<(Handler<T>, Vec<String>)> {
         let mut params = Vec::new();
         if let Some(handler) = self.match_path(method, path_parts, &mut params) {
             Some((handler, params))
@@ -84,7 +94,7 @@ impl Node {
         method: Method,
         path_parts: &[&str],
         params: &mut Vec<String>,
-    ) -> Option<Handler> {
+    ) -> Option<Handler<T>> {
         if path_parts.is_empty() {
             return self.handlers.get(&method).copied();
         }

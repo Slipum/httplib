@@ -7,7 +7,7 @@ struct CreateUserPayload {
     name: String,
 }
 
-fn handler_creat_user(_request: &Request, _params: &[&str]) -> Response {
+fn handler_creat_user(_request: &Request<()>, _params: &[&str]) -> Response {
     match serde_json::from_str::<CreateUserPayload>(_request.get_body()) {
         Ok(user_data) => {
             let body = json!({ "message": format!("Create user with name: {}", user_data.name) }).to_string();
@@ -20,7 +20,7 @@ fn handler_creat_user(_request: &Request, _params: &[&str]) -> Response {
     }
 }
 
-fn build_router() -> Router {
+fn build_router() -> Router<()> {
     let mut router = Router::new();
     router
         .add(Method::POST, "/user", handler_creat_user);
@@ -30,9 +30,11 @@ fn build_router() -> Router {
 fn main() {
     let router = build_router();
 
-    let server = Server::new("0.0.0.0", 7878)
-        .with_router(router)
-        .enable_logger();
+    let server = Server::builder()
+        .port(7878)
+        .router(router)
+        .enable_logger()
+        .build();
 
     server.start();
 }
